@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Excel Upload and Tabs</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f4f4f4;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 50px auto;
+        background: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+
+      #excelFile,
+      #copyHtmlButton {
+        display: block;
+        margin: 20px auto;
+      }
+
+      .nav-tabs {
+        display: flex;
+        gap: 10px;
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        overflow-x: scroll;
+      }
+
+      .nav-tabs .nav-link {
+        padding: 10px 20px;
+        border: 1px solid #ccc;
+        background: #e0e0e0;
+        border-radius: 5px;
+        cursor: pointer;
+        text-wrap: nowrap;
+      }
+
+      .nav-tabs .nav-link.active {
+        background: #007bff;
+        color: white;
+      }
+
+      .tab-content .tab-pane {
+        display: none;
+        border: 1px solid #ccc;
+        padding: 20px;
+        border-radius: 5px;
+        background: #fafafa;
+      }
+
+      .tab-content .tab-pane.active {
+        display: block;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+
+      th {
+        background-color: #f2f2f2;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Excel Data Viewer</h1>
+      <input type="file" id="excelFile" accept=".xlsx, .xls" />
+      <button id="copyHtmlButton" style="display: none">Copy HTML</button>
+      <ul class="nav-tabs" id="tabs"></ul>
+      <div class="tab-content" id="tabContent"></div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+      document
+        .getElementById("excelFile")
+        .addEventListener("change", function (event) {
+          const file = event.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+              const data = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(data, { type: "array" });
+              const sheetName = workbook.SheetNames[0];
+              const sheetData = XLSX.utils.sheet_to_json(
+                workbook.Sheets[sheetName]
+              );
+
+              renderTabs(sheetData);
+
+              // Show the copy HTML button
+              document.getElementById("copyHtmlButton").style.display = "block";
+            };
+            reader.readAsArrayBuffer(file);
+          }
+        });
+
+      function renderTabs(data) {
+        const grades = [...new Set(data.map((row) => row["Grade"]))];
+        const tabsContainer = document.getElementById("tabs");
+        const tabContentContainer = document.getElementById("tabContent");
+
+        tabsContainer.innerHTML = "";
+        tabContentContainer.innerHTML = "";
+
+        grades.forEach((grade, index) => {
+          // Create tab buttons
+          const tabButton = document.createElement("li");
+          tabButton.className = `nav-link ${index === 0 ? "active" : ""}`;
+          tabButton.textContent = grade;
+          tabButton.setAttribute("data-target", `tab-pane-${index}`);
+          tabButton.addEventListener("click", () => {
+            document
+              .querySelectorAll(".nav-link")
+              .forEach((btn) => btn.classList.remove("active"));
+            document
+              .querySelectorAll(".tab-pane")
+              .forEach((pane) => pane.classList.remove("active"));
+            tabButton.classList.add("active");
+            document
+              .getElementById(`tab-pane-${index}`)
+              .classList.add("active");
+          });
+
+          tabsContainer.appendChild(tabButton);
+
+          // Create tab content
+          const tabPane = document.createElement("div");
+          tabPane.className = `tab-pane ${index === 0 ? "active" : ""}`;
+          tabPane.id = `tab-pane-${index}`;
+
+          const filteredData = data.filter((row) => row["Grade"] === grade);
+          const table = document.createElement("table");
+          table.innerHTML = `
+          <thead>
+            <tr>
+              <th>Auction Date</th>
+              <th>Mines</th>
+              <th>Grade</th>
+              <th>DD Price (Without GST)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredData
+              .map(
+                (row) => `
+              <tr>
+                <td>${row["Aucton Date"]}</td>
+                <td>${row["Mines"]}</td>
+                <td>${row["Grade"]}</td>
+                <td>${row["DD Price (Without GST)"]}</td>
+              </tr>
+            `
+              )
+              .join("")}
+          </tbody>
+        `;
+
+          tabPane.appendChild(table);
+          tabContentContainer.appendChild(tabPane);
+        });
+      }
+
+      document
+        .getElementById("copyHtmlButton")
+        .addEventListener("click", function () {
+          const htmlContent = document.documentElement.outerHTML;
+
+          navigator.clipboard
+            .writeText(htmlContent)
+            .then(() => {
+              alert("HTML code copied to clipboard!");
+            })
+            .catch((err) => {
+              console.error("Failed to copy HTML:", err);
+            });
+        });
+    </script>
+    <script>
+      document.querySelectorAll(".nav-link").forEach((tab) => {
+        tab.addEventListener("click", function () {
+          // Remove active class from all tabs and panes
+          document
+            .querySelectorAll(".nav-link")
+            .forEach((t) => t.classList.remove("active"));
+          document
+            .querySelectorAll(".tab-pane")
+            .forEach((pane) => pane.classList.remove("active"));
+
+          // Add active class to the clicked tab and its pane
+          const targetPane = document.getElementById(
+            this.getAttribute("data-target")
+          );
+          this.classList.add("active");
+          targetPane.classList.add("active");
+        });
+      });
+    </script>
+  </body>
+</html>
