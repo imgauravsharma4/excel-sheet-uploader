@@ -3,97 +3,131 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Excel Upload and Tabs</title>
+    <title>Coal Mine Price Analysis</title>
     <style>
       body {
         font-family: Arial, sans-serif;
-        background: #f4f4f4;
+        background: #f9f9f9;
         margin: 0;
         padding: 0;
       }
 
       .container {
-        max-width: 800px;
-        margin: 50px auto;
-        background: #fff;
+        background: #ffffff;
         padding: 20px;
         border-radius: 8px;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
       }
 
-      h1 {
-        text-align: center;
+      .button-container {
+        display: flex;
+        align-items: center;
+      }
+
+      h2 {
         margin-bottom: 20px;
       }
 
-      #excelFile,
-      #copyHtmlButton {
+      #excelFile {
         display: block;
-        margin: 20px auto;
+        margin: 0 20px;
       }
 
       .nav-tabs {
         display: flex;
-        gap: 10px;
-        list-style: none;
+        gap: 8px;
+        margin-bottom: 20px;
         padding: 0;
-        margin: 0;
+        list-style: none;
         overflow-x: scroll;
+        scrollbar-width: none; /* For Firefox */
+        -ms-overflow-style: none; /* For Internet Explorer 10+ */
       }
 
+      .nav-tabs::-webkit-scrollbar {
+        display: none; /* For Chrome, Safari, and Edge */
+      }
       .nav-tabs .nav-link {
-        padding: 10px 20px;
+        padding: 10px 15px;
         border: 1px solid #ccc;
-        background: #e0e0e0;
-        border-radius: 5px;
+        border-radius: 20px;
+        background: #f0f0f0;
+        color: #333;
         cursor: pointer;
-        text-wrap: nowrap;
+        text-align: center;
       }
 
       .nav-tabs .nav-link.active {
         background: #007bff;
-        color: white;
+        color: #fff;
       }
 
-      .tab-content .tab-pane {
-        display: none;
-        border: 1px solid #ccc;
-        padding: 20px;
-        border-radius: 5px;
-        background: #fafafa;
-      }
-
-      .tab-content .tab-pane.active {
-        display: block;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
+      .tab-content {
         margin-top: 20px;
       }
 
-      th,
-      td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
+      .tab-pane {
+        display: none;
       }
 
-      th {
-        background-color: #f2f2f2;
+      .tab-pane.active {
+        display: block;
+      }
+
+      .mine-card {
+        background: #fafafa;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+
+      .mine-card h4 {
+        margin: 0 0 10px;
+        color: #333;
+      }
+
+      .mine-card .grade {
+        font-weight: bold;
+        color: #007bff;
+      }
+
+      .mine-card .price {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-top: 10px;
+        color: #28a745;
+      }
+
+      canvas {
+        margin-top: 20px;
+      }
+
+      #copyHtmlButton {
+        padding: 10px 15px;
+        border: 1px solid #ccc;
+        border-radius: 20px;
+        cursor: pointer;
+        text-align: center;
+        background: #007bff;
+        color: #fff;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Excel Data Viewer</h1>
-      <input type="file" id="excelFile" accept=".xlsx, .xls" />
-      <button id="copyHtmlButton" style="display: none">Copy HTML</button>
+      <h2>Coal Mine Price Analysis</h2>
+      <div class="button-container">
+        <input type="file" id="excelFile" accept=".xlsx, .xls" />
+        <button id="copyHtmlButton" style="display: none">Copy HTML</button>
+      </div>
+
       <ul class="nav-tabs" id="tabs"></ul>
       <div class="tab-content" id="tabContent"></div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
       document
         .getElementById("excelFile")
@@ -110,27 +144,41 @@
               );
 
               renderTabs(sheetData);
-
-              // Show the copy HTML button
-              document.getElementById("copyHtmlButton").style.display = "block";
             };
             reader.readAsArrayBuffer(file);
           }
         });
 
       function renderTabs(data) {
-        const grades = [...new Set(data.map((row) => row["Grade"]))];
         const tabsContainer = document.getElementById("tabs");
         const tabContentContainer = document.getElementById("tabContent");
+
+        // Sort data by auction date in descending order for "Latest" tab
+        const sortedData = data.sort(
+          (a, b) => new Date(b["Aucton Date"]) - new Date(a["Aucton Date"])
+        );
+
+        // Get unique grades and sort them in descending order
+        const grades = [...new Set(data.map((row) => row["Grade"]))].sort(
+          (a, b) => b.localeCompare(a, undefined, { numeric: true })
+        );
 
         tabsContainer.innerHTML = "";
         tabContentContainer.innerHTML = "";
 
+        // Add "Latest" tab
+        createTab("Latest", sortedData, true);
+
+        // Add tabs for each grade
         grades.forEach((grade, index) => {
-          // Create tab buttons
+          const filteredData = data.filter((row) => row["Grade"] === grade);
+          createTab(grade, filteredData, false, index + 1);
+        });
+
+        function createTab(title, tabData, isActive, index = 0) {
           const tabButton = document.createElement("li");
-          tabButton.className = `nav-link ${index === 0 ? "active" : ""}`;
-          tabButton.textContent = grade;
+          tabButton.className = `nav-link ${isActive ? "active" : ""}`;
+          tabButton.textContent = title;
           tabButton.setAttribute("data-target", `tab-pane-${index}`);
           tabButton.addEventListener("click", () => {
             document
@@ -147,59 +195,140 @@
 
           tabsContainer.appendChild(tabButton);
 
-          // Create tab content
           const tabPane = document.createElement("div");
-          tabPane.className = `tab-pane ${index === 0 ? "active" : ""}`;
+          tabPane.className = `tab-pane ${isActive ? "active" : ""}`;
           tabPane.id = `tab-pane-${index}`;
 
-          const filteredData = data.filter((row) => row["Grade"] === grade);
-          const table = document.createElement("table");
-          table.innerHTML = `
-          <thead>
-            <tr>
-              <th>Auction Date</th>
-              <th>Mines</th>
-              <th>Grade</th>
-              <th>DD Price (Without GST)</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${filteredData
-              .map(
-                (row) => `
-              <tr>
-                <td>${row["Aucton Date"]}</td>
-                <td>${row["Mines"]}</td>
-                <td>${row["Grade"]}</td>
-                <td>${row["DD Price (Without GST)"]}</td>
-              </tr>
-            `
-              )
-              .join("")}
-          </tbody>
-        `;
+          tabData.forEach((row) => {
+            const mineCard = document.createElement("div");
+            mineCard.className = "mine-card";
+            mineCard.innerHTML = `
+              <h4>${row["Mines"]}</h4>
+              <p class="grade">Grade: ${row["Grade"]}</p>
+              <p class="price">₹${row["DD Price (Without GST)"]}</p>
+            `;
+            tabPane.appendChild(mineCard);
+          });
 
-          tabPane.appendChild(table);
+          // Add graph
+          const canvas = document.createElement("canvas");
+          canvas.id = `graph-${index}`;
+          tabPane.appendChild(canvas);
           tabContentContainer.appendChild(tabPane);
+
+          // Render graph
+          renderGraph(
+            `graph-${index}`,
+            tabData.map((row) => row["Aucton Date"]),
+            tabData.map((row) => row["DD Price (Without GST)"])
+          );
+        }
+        // Show the copy HTML button
+        document.getElementById("copyHtmlButton").style.display = "block";
+      }
+
+      function renderGraph(canvasId, labels, data) {
+        const ctx = document.getElementById(canvasId).getContext("2d");
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: "Price (₹)",
+                data: data,
+                borderColor: "#007bff",
+                backgroundColor: "rgba(0, 123, 255, 0.2)",
+                fill: true,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: {
+                display: true,
+              },
+            },
+          },
         });
       }
 
       document
         .getElementById("copyHtmlButton")
         .addEventListener("click", function () {
-          const htmlContent = document.documentElement.outerHTML;
+          const tabs = document.querySelectorAll(".nav-link");
+          const originalTab = document.querySelector(".nav-link.active"); // Save the active tab
 
-          navigator.clipboard
-            .writeText(htmlContent)
-            .then(() => {
-              alert("HTML code copied to clipboard!");
-            })
-            .catch((err) => {
-              console.error("Failed to copy HTML:", err);
+          const renderAllGraphs = (callback) => {
+            let currentIndex = 0;
+
+            const activateTabAndRenderGraph = () => {
+              if (currentIndex < tabs.length) {
+                const tab = tabs[currentIndex];
+                const targetPaneId = tab.getAttribute("data-target");
+                const targetPane = document.getElementById(targetPaneId);
+
+                // Simulate clicking the tab
+                tabs.forEach((t) => t.classList.remove("active"));
+                tab.classList.add("active");
+
+                document
+                  .querySelectorAll(".tab-pane")
+                  .forEach((pane) => pane.classList.remove("active"));
+                targetPane.classList.add("active");
+
+                setTimeout(() => {
+                  // Proceed to the next tab
+                  currentIndex++;
+                  activateTabAndRenderGraph();
+                }, 100); // Give time for the graph to render
+              } else {
+                // Restore the original tab selection
+                if (originalTab) {
+                  originalTab.click();
+                }
+
+                // All graphs rendered, execute the callback
+                callback();
+              }
+            };
+
+            activateTabAndRenderGraph();
+          };
+
+          const convertCanvasToImage = () => {
+            const canvases = document.querySelectorAll("canvas");
+
+            canvases.forEach((canvas) => {
+              const dataURL = canvas.toDataURL(); // Convert canvas to image
+              const img = document.createElement("img");
+              img.src = dataURL;
+              img.alt = "Graph";
+
+              // Replace the canvas with the image
+              canvas.parentNode.replaceChild(img, canvas);
             });
+
+            const htmlContent = document.documentElement.outerHTML;
+
+            navigator.clipboard
+              .writeText(htmlContent)
+              .then(() => {
+                alert("HTML code copied to clipboard!");
+              })
+              .catch((err) => {
+                console.error("Failed to copy HTML:", err);
+              });
+          };
+
+          // Show the copy HTML button
+          document.getElementById("excelFile").style.display = "none";
+          document.getElementById("copyHtmlButton").style.display = "none";
+          // Render all graphs first, then copy the HTML
+          renderAllGraphs(convertCanvasToImage);
         });
-    </script>
-    <script>
+
       document.querySelectorAll(".nav-link").forEach((tab) => {
         tab.addEventListener("click", function () {
           // Remove active class from all tabs and panes
