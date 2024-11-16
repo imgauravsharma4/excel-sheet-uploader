@@ -99,10 +99,6 @@
         color: #28a745;
       }
 
-      canvas {
-        margin-top: 20px;
-      }
-
       #copyHtmlButton {
         padding: 10px 15px;
         border-radius: 20px;
@@ -111,6 +107,10 @@
         text-align: center;
         background: #007bff;
         color: #fff;
+      }
+      .myChart {
+        max-width: 600px;
+        max-height: 300px;
       }
     </style>
   </head>
@@ -136,12 +136,27 @@
             const reader = new FileReader();
             reader.onload = function (e) {
               const data = new Uint8Array(e.target.result);
-              const workbook = XLSX.read(data, { type: "array" });
+              const workbook = XLSX.read(data, {
+                type: "array",
+                cellDates: true,
+              });
               const sheetName = workbook.SheetNames[0];
               const sheetData = XLSX.utils.sheet_to_json(
                 workbook.Sheets[sheetName]
               );
 
+              sheetData.forEach((row) => {
+                if (row["Aucton Date"] instanceof Date) {
+                  // Format the date as desired
+                  row["Aucton Date"] = row["Aucton Date"].toLocaleDateString(
+                    "en-US",
+                    { year: "numeric", month: "2-digit", day: "2-digit" }
+                  );
+                }
+                if (row["Grade"]) {
+                  row["Grade"] = row["Grade"].replace(/\s+/g, "");
+                }
+              });
               renderTabs(sheetData);
             };
             reader.readAsArrayBuffer(file);
@@ -165,8 +180,13 @@
         tabsContainer.innerHTML = "";
         tabContentContainer.innerHTML = "";
 
+        // Get the latest date and filter data accordingly
+        const latestDate = sortedData[0]["Aucton Date"];
+        const latestData = sortedData.filter(
+          (row) => row["Aucton Date"] === latestDate
+        );
         // Add "Latest" tab
-        createTab("Latest", sortedData, true);
+        createTab("Latest", latestData, true);
 
         // Add tabs for each grade
         grades.forEach((grade, index) => {
@@ -202,16 +222,18 @@
             const mineCard = document.createElement("div");
             mineCard.className = "mine-card";
             mineCard.innerHTML = `
-              <h4>${row["Mines"]}</h4>
-              <p class="grade">Grade: ${row["Grade"]}</p>
-              <p class="price">₹${row["DD Price (Without GST)"]}</p>
-            `;
+                    <h4>${row["Mines"]}</h4>
+                    <p class="grade">Grade: ${row["Grade"]}</p>
+                    <p class="price">₹${row["DD Price (Without GST)"]}</p>
+                  `;
             tabPane.appendChild(mineCard);
           });
 
           // Add graph
           const canvas = document.createElement("canvas");
           canvas.id = `graph-${index}`;
+          canvas.className = "myChart";
+          canvas.height = 300;
           tabPane.appendChild(canvas);
           tabContentContainer.appendChild(tabPane);
 
@@ -225,20 +247,30 @@
         // Show the copy HTML button
         document.getElementById("copyHtmlButton").style.display = "block";
       }
-
       function renderGraph(canvasId, labels, data) {
         const ctx = document.getElementById(canvasId).getContext("2d");
+
+        // Format labels for better readability
+        const formattedLabels = labels.map((label) => {
+          const date = new Date(label);
+          return `${date.getMonth() + 1}-${date.getDate()}`; // Add 1 to month for zero-based indexing
+        });
+
+        // Create the chart with more customization options
         new Chart(ctx, {
           type: "line",
           data: {
-            labels: labels,
+            labels: formattedLabels,
             datasets: [
               {
-                label: "Price (₹)",
+                label: "Average Price (₹)", // Clearer label
                 data: data,
-                borderColor: "#007bff",
-                backgroundColor: "rgba(0, 123, 255, 0.2)",
-                fill: true,
+                borderColor: "rgb(75, 192, 192)", // Customizable color
+                backgroundColor: "rgba(75, 192, 192, 0.2)",
+                pointRadius: 5, // Larger point radius for better visibility
+                pointBackgroundColor: "rgb(75, 192, 192)",
+                pointBorderColor: "#fff",
+                tension: 0.4, // Adjust curve smoothness
               },
             ],
           },
@@ -246,13 +278,28 @@
             responsive: true,
             plugins: {
               legend: {
-                display: true,
+                position: "top", // Position the legend at the top
+              },
+            },
+            scales: {
+              x: {
+                grid: {
+                  display: false, // Remove x-axis grid lines
+                },
+              },
+              y: {
+                beginAtZero: true, // Start y-axis from zero
+                ticks: {
+                  stepSize: 2000,
+                  callback: function (value, index, values) {
+                    return "₹" + value; // Add currency symbol to y-axis labels
+                  },
+                },
               },
             },
           },
         });
       }
-
       document
         .getElementById("copyHtmlButton")
         .addEventListener("click", function () {
