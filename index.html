@@ -221,41 +221,65 @@
           tabPane.className = `tab-pane ${isActive ? "active" : ""}`;
           tabPane.id = `tab-pane-${index}`;
 
-          tabData.forEach((row, cardIndex) => {
-            function createCard(row, index, tabIndex) {
-              const mineCard = document.createElement("div");
-              mineCard.className = "mine-card";
-              mineCard.setAttribute("data-dates", row["Aucton Date"]);
-              mineCard.setAttribute(
-                "data-prices",
-                row["DD Price (Without GST)"]
-              );
-              mineCard.innerHTML = `
-            <h4>${row["Mines"]}</h4>
-            <p class="grade">Grade: ${row["Grade"]}</p>
-            <p class="price">₹${row["DD Price (Without GST)"]}</p>
-            <div id="graph-container-${tabIndex}-${index}" class="graph-container" style="display: none;">
-                <canvas id="graph-${tabIndex}-${index}" class="myChart" height="300"></canvas>
-            </div>
-          `;
-              // Add the onclick function directly to the mineCard element
-              mineCard.setAttribute(
-                "onclick",
-                `
-    const graphContainer = document.getElementById('graph-container-${tabIndex}-${index}');
-    const canvas = document.getElementById('graph-${tabIndex}-${index}');
-    if (graphContainer.style.display === 'none') {
-      graphContainer.style.display = 'block'; // Show the graph
-      renderGraph(canvas.id, ['${row["Aucton Date"]}'], ['${row["DD Price (Without GST)"]}']);
-    } else {
-      graphContainer.style.display = 'none'; // Hide the graph
-    }
-  `
-              );
-              return mineCard;
-            }
-            tabPane.appendChild(createCard(row, cardIndex, index));
+          // Group data by mine name
+          const groupedData = groupByMineName(tabData);
+
+          Object.keys(groupedData).forEach((mineName, cardIndex) => {
+            const mineData = groupedData[mineName];
+            tabPane.appendChild(
+              createCard(mineName, mineData, index, cardIndex)
+            );
           });
+
+          function groupByMineName(data) {
+            return data.reduce((result, row) => {
+              if (!result[row["Mines"]]) {
+                result[row["Mines"]] = [];
+              }
+              result[row["Mines"]].push(row);
+              return result;
+            }, {});
+          }
+
+          function createCard(mineName, mineData, tabIndex, index) {
+            const mineCard = document.createElement("div");
+            mineCard.className = "mine-card";
+            mineCard.setAttribute(
+              "data-dates",
+              mineData.map((row) => row["Aucton Date"]).join(",")
+            );
+            mineCard.setAttribute(
+              "data-prices",
+              mineData.map((row) => row["DD Price (Without GST)"]).join(",")
+            );
+            mineCard.innerHTML = `
+              <h4>${mineName}</h4>
+              <p class="grade">Grade: ${mineData[0]["Grade"]}</p>
+              <p class="price">₹ ${mineData[0]["DD Price (Without GST)"]}</p>
+              <div id="graph-container-${tabIndex}-${index}" class="graph-container" style="display: none;">
+                  <canvas id="graph-${tabIndex}-${index}" class="myChart" height="300"></canvas>
+              </div>
+            `;
+            // Add the onclick function directly to the mineCard element
+            mineCard.setAttribute(
+              "onclick",
+              `
+                const graphContainer = document.getElementById('graph-container-${tabIndex}-${index}');
+                const canvas = document.getElementById('graph-${tabIndex}-${index}');
+                if (graphContainer.style.display === 'none') {
+                  graphContainer.style.display = 'block'; // Show the graph
+                  renderGraph(canvas.id, ${JSON.stringify(
+                    mineData.map((row) => row["Aucton Date"])
+                  )}, ${JSON.stringify(
+                mineData.map((row) => row["DD Price (Without GST)"])
+              )});
+                } else {
+                  graphContainer.style.display = 'none'; // Hide the graph
+                }
+              `
+            );
+            return mineCard;
+          }
 
           // Add graph
           const canvas = document.createElement("canvas");
