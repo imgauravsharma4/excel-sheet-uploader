@@ -30,7 +30,6 @@
 
       #excelFile {
         display: block;
-        margin: 0 20px;
       }
 
       .nav-tabs {
@@ -49,12 +48,12 @@
       }
       .nav-tabs .nav-link {
         padding: 10px 15px;
-        border: 1px solid #ccc;
         border-radius: 20px;
         background: #f0f0f0;
         color: #333;
         cursor: pointer;
         text-align: center;
+        text-wrap: nowrap;
       }
 
       .nav-tabs .nav-link.active {
@@ -106,8 +105,8 @@
 
       #copyHtmlButton {
         padding: 10px 15px;
-        border: 1px solid #ccc;
         border-radius: 20px;
+        border: none;
         cursor: pointer;
         text-align: center;
         background: #007bff;
@@ -120,7 +119,7 @@
       <h2>Coal Mine Price Analysis</h2>
       <div class="button-container">
         <input type="file" id="excelFile" accept=".xlsx, .xls" />
-        <button id="copyHtmlButton" style="display: none">Copy HTML</button>
+        <button id="copyHtmlButton" style="display: none">Copy</button>
       </div>
 
       <ul class="nav-tabs" id="tabs"></ul>
