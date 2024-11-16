@@ -112,6 +112,9 @@
         max-width: 600px;
         max-height: 300px;
       }
+      .graph-container {
+        display: none; /* Initially hide the graph inside the card */
+      }
     </style>
   </head>
   <body>
@@ -222,11 +225,36 @@
             const mineCard = document.createElement("div");
             mineCard.className = "mine-card";
             mineCard.innerHTML = `
-                    <h4>${row["Mines"]}</h4>
-                    <p class="grade">Grade: ${row["Grade"]}</p>
-                    <p class="price">₹${row["DD Price (Without GST)"]}</p>
-                  `;
+            <h4>${row["Mines"]}</h4>
+            <p class="grade">Grade: ${row["Grade"]}</p>
+            <p class="price">₹${row["DD Price (Without GST)"]}</p>
+            <div id="graph-container-${index}-${row["Mines"]}" class="graph-container" style="display: none;">
+                <canvas id="graph-${index}-${row["Mines"]}" class="myChart" height="300"></canvas>
+            </div>
+          `;
             tabPane.appendChild(mineCard);
+
+            // Add click event to show/hide the graph inside the card
+            mineCard.addEventListener("click", () => {
+              const graphContainer = document.getElementById(
+                `graph-container-${index}-${row["Mines"]}`
+              );
+              const canvas = document.getElementById(
+                `graph-${index}-${row["Mines"]}`
+              );
+
+              // Toggle the visibility of the graph
+              if (graphContainer.style.display === "none") {
+                graphContainer.style.display = "block"; // Show the graph
+                renderGraph(
+                  `graph-${index}-${row["Mines"]}`,
+                  [row["Aucton Date"]],
+                  [row["DD Price (Without GST)"]]
+                );
+              } else {
+                graphContainer.style.display = "none"; // Hide the graph
+              }
+            });
           });
 
           // Add graph
@@ -235,8 +263,8 @@
           canvas.className = "myChart";
           canvas.height = 300;
           tabPane.appendChild(canvas);
-          tabContentContainer.appendChild(tabPane);
 
+          tabContentContainer.appendChild(tabPane);
           // Render graph
           renderGraph(
             `graph-${index}`,
@@ -244,9 +272,11 @@
             tabData.map((row) => row["DD Price (Without GST)"])
           );
         }
+
         // Show the copy HTML button
         document.getElementById("copyHtmlButton").style.display = "block";
       }
+
       function renderGraph(canvasId, labels, data) {
         const ctx = document.getElementById(canvasId).getContext("2d");
 
@@ -300,6 +330,7 @@
           },
         });
       }
+
       document
         .getElementById("copyHtmlButton")
         .addEventListener("click", function () {
