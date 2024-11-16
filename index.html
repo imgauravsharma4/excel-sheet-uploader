@@ -221,40 +221,40 @@
           tabPane.className = `tab-pane ${isActive ? "active" : ""}`;
           tabPane.id = `tab-pane-${index}`;
 
-          tabData.forEach((row) => {
-            const mineCard = document.createElement("div");
-            mineCard.className = "mine-card";
-            mineCard.innerHTML = `
+          tabData.forEach((row, cardIndex) => {
+            function createCard(row, index, tabIndex) {
+              const mineCard = document.createElement("div");
+              mineCard.className = "mine-card";
+              mineCard.setAttribute("data-dates", row["Aucton Date"]);
+              mineCard.setAttribute(
+                "data-prices",
+                row["DD Price (Without GST)"]
+              );
+              mineCard.innerHTML = `
             <h4>${row["Mines"]}</h4>
             <p class="grade">Grade: ${row["Grade"]}</p>
             <p class="price">₹${row["DD Price (Without GST)"]}</p>
-            <div id="graph-container-${index}-${row["Mines"]}" class="graph-container" style="display: none;">
-                <canvas id="graph-${index}-${row["Mines"]}" class="myChart" height="300"></canvas>
+            <div id="graph-container-${tabIndex}-${index}" class="graph-container" style="display: none;">
+                <canvas id="graph-${tabIndex}-${index}" class="myChart" height="300"></canvas>
             </div>
           `;
-            tabPane.appendChild(mineCard);
-
-            // Add click event to show/hide the graph inside the card
-            mineCard.addEventListener("click", () => {
-              const graphContainer = document.getElementById(
-                `graph-container-${index}-${row["Mines"]}`
+              // Add the onclick function directly to the mineCard element
+              mineCard.setAttribute(
+                "onclick",
+                `
+    const graphContainer = document.getElementById('graph-container-${tabIndex}-${index}');
+    const canvas = document.getElementById('graph-${tabIndex}-${index}');
+    if (graphContainer.style.display === 'none') {
+      graphContainer.style.display = 'block'; // Show the graph
+      renderGraph(canvas.id, ['${row["Aucton Date"]}'], ['${row["DD Price (Without GST)"]}']);
+    } else {
+      graphContainer.style.display = 'none'; // Hide the graph
+    }
+  `
               );
-              const canvas = document.getElementById(
-                `graph-${index}-${row["Mines"]}`
-              );
-
-              // Toggle the visibility of the graph
-              if (graphContainer.style.display === "none") {
-                graphContainer.style.display = "block"; // Show the graph
-                renderGraph(
-                  `graph-${index}-${row["Mines"]}`,
-                  [row["Aucton Date"]],
-                  [row["DD Price (Without GST)"]]
-                );
-              } else {
-                graphContainer.style.display = "none"; // Hide the graph
-              }
-            });
+              return mineCard;
+            }
+            tabPane.appendChild(createCard(row, cardIndex, index));
           });
 
           // Add graph
@@ -277,8 +277,24 @@
         document.getElementById("copyHtmlButton").style.display = "block";
       }
 
+      // Store references to all created charts
+      const chartInstances = {};
+
       function renderGraph(canvasId, labels, data) {
-        const ctx = document.getElementById(canvasId).getContext("2d");
+        const canvasElement = document.getElementById(canvasId);
+
+        if (!canvasElement) {
+          console.error(`Canvas with ID '${canvasId}' not found.`);
+          return;
+        }
+
+        const ctx = canvasElement.getContext("2d");
+
+        // Check if a chart already exists on this canvas and destroy it
+        if (chartInstances[canvasId]) {
+          chartInstances[canvasId].destroy();
+          delete chartInstances[canvasId];
+        }
 
         // Format labels for better readability
         const formattedLabels = labels.map((label) => {
@@ -286,8 +302,8 @@
           return `${date.getMonth() + 1}-${date.getDate()}`; // Add 1 to month for zero-based indexing
         });
 
-        // Create the chart with more customization options
-        new Chart(ctx, {
+        // Create a new chart and store its reference
+        chartInstances[canvasId] = new Chart(ctx, {
           type: "line",
           data: {
             labels: formattedLabels,
@@ -321,7 +337,7 @@
                 beginAtZero: true, // Start y-axis from zero
                 ticks: {
                   stepSize: 2000,
-                  callback: function (value, index, values) {
+                  callback: function (value) {
                     return "₹" + value; // Add currency symbol to y-axis labels
                   },
                 },
@@ -330,81 +346,111 @@
           },
         });
       }
-
       document
         .getElementById("copyHtmlButton")
         .addEventListener("click", function () {
-          const tabs = document.querySelectorAll(".nav-link");
-          const originalTab = document.querySelector(".nav-link.active"); // Save the active tab
-
-          const renderAllGraphs = (callback) => {
-            let currentIndex = 0;
-
-            const activateTabAndRenderGraph = () => {
-              if (currentIndex < tabs.length) {
-                const tab = tabs[currentIndex];
-                const targetPaneId = tab.getAttribute("data-target");
-                const targetPane = document.getElementById(targetPaneId);
-
-                // Simulate clicking the tab
-                tabs.forEach((t) => t.classList.remove("active"));
-                tab.classList.add("active");
-
-                document
-                  .querySelectorAll(".tab-pane")
-                  .forEach((pane) => pane.classList.remove("active"));
-                targetPane.classList.add("active");
-
-                setTimeout(() => {
-                  // Proceed to the next tab
-                  currentIndex++;
-                  activateTabAndRenderGraph();
-                }, 100); // Give time for the graph to render
-              } else {
-                // Restore the original tab selection
-                if (originalTab) {
-                  originalTab.click();
-                }
-
-                // All graphs rendered, execute the callback
-                callback();
-              }
-            };
-
-            activateTabAndRenderGraph();
-          };
-
-          const convertCanvasToImage = () => {
-            const canvases = document.querySelectorAll("canvas");
-
-            canvases.forEach((canvas) => {
-              const dataURL = canvas.toDataURL(); // Convert canvas to image
-              const img = document.createElement("img");
-              img.src = dataURL;
-              img.alt = "Graph";
-
-              // Replace the canvas with the image
-              canvas.parentNode.replaceChild(img, canvas);
-            });
-
-            const htmlContent = document.documentElement.outerHTML;
-
-            navigator.clipboard
-              .writeText(htmlContent)
-              .then(() => {
-                alert("HTML code copied to clipboard!");
-              })
-              .catch((err) => {
-                console.error("Failed to copy HTML:", err);
-              });
-          };
-
-          // Show the copy HTML button
+          // Hide buttons to prevent inclusion in copied HTML
           document.getElementById("excelFile").style.display = "none";
           document.getElementById("copyHtmlButton").style.display = "none";
-          // Render all graphs first, then copy the HTML
-          renderAllGraphs(convertCanvasToImage);
+
+          // Show all graph containers before copying
+          document.querySelectorAll(".graph-container").forEach((container) => {
+            container.style.display = "block";
+          });
+          // Render all graphs and then replace canvases with images
+          renderAllGraphs(() => {
+            convertCanvasToImage();
+          });
         });
+
+      const renderAllGraphs = (callback) => {
+        const tabs = document.querySelectorAll(".nav-link");
+        let currentIndex = 0;
+
+        const activateTabAndRenderGraphs = () => {
+          if (currentIndex < tabs.length) {
+            const tab = tabs[currentIndex];
+            const targetPaneId = tab.getAttribute("data-target");
+            const targetPane = document.getElementById(targetPaneId);
+
+            // Activate the tab
+            tabs.forEach((t) => t.classList.remove("active"));
+            tab.classList.add("active");
+
+            document
+              .querySelectorAll(".tab-pane")
+              .forEach((pane) => pane.classList.remove("active"));
+            targetPane.classList.add("active");
+
+            setTimeout(() => {
+              // Render main graph in the tab
+              const mainCanvas = targetPane.querySelector(".myChart");
+              if (mainCanvas) {
+                const dates = targetPane.getAttribute("data-dates")?.split(",");
+                const prices = targetPane
+                  .getAttribute("data-prices")
+                  ?.split(",");
+                if (dates && prices) {
+                  renderGraph(mainCanvas.id, dates, prices);
+                }
+              }
+
+              // Render graphs in all cards
+              const cardCanvases =
+                targetPane.querySelectorAll(".mine-card canvas");
+              cardCanvases.forEach((canvas) => {
+                const parentCard = canvas.closest(".mine-card");
+                const dates = parentCard.getAttribute("data-dates").split(",");
+                const prices = parentCard
+                  .getAttribute("data-prices")
+                  .split(",");
+                renderGraph(canvas.id, dates, prices);
+              });
+
+              // Move to the next tab
+              currentIndex++;
+              activateTabAndRenderGraphs();
+            }, 300); // Allow time for graphs to render
+          } else {
+            // All graphs are rendered, call the callback
+            callback();
+          }
+        };
+
+        activateTabAndRenderGraphs();
+      };
+
+      const convertCanvasToImage = () => {
+        const canvases = document.querySelectorAll("canvas");
+
+        canvases.forEach((canvas) => {
+          const dataURL = canvas.toDataURL(); // Convert canvas to image
+          const img = document.createElement("img");
+          img.src = dataURL;
+          img.alt = "Graph";
+          img.style.width = canvas.style.width; // Match the canvas size
+          img.style.height = canvas.style.height;
+
+          // Replace the canvas with the image
+          canvas.parentNode.replaceChild(img, canvas);
+
+          // Show all graph containers before copying
+          document.querySelectorAll(".graph-container").forEach((container) => {
+            container.style.display = "none";
+          });
+        });
+
+        const htmlContent = document.documentElement.outerHTML;
+
+        navigator.clipboard
+          .writeText(htmlContent)
+          .then(() => {
+            alert("HTML code copied to clipboard!");
+          })
+          .catch((err) => {
+            console.error("Failed to copy HTML:", err);
+          });
+      };
 
       document.querySelectorAll(".nav-link").forEach((tab) => {
         tab.addEventListener("click", function () {
